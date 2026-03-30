@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - copilot/add-trending-releases-website
 
 # Allow only one concurrent deployment
 concurrency:
@@ -30,7 +31,17 @@ jobs:
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
+          if [ -z "${TMDB_API_KEY}" ]; then
+            echo "::error::TMDB_API_KEY secret is not set. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
           sed -i "s|__TMDB_API_KEY__|${TMDB_API_KEY}|g" js/config.js
+          # Verify the placeholder was replaced
+          if grep -q '__TMDB_API_KEY__' js/config.js; then
+            echo "::error::Placeholder __TMDB_API_KEY__ was not replaced in js/config.js"
+            exit 1
+          fi
+          echo "API key injected successfully (${#TMDB_API_KEY} chars)."
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
