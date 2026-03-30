@@ -12,9 +12,18 @@ const MS_PER_DAY = 86_400_000;
    --------------------------------------------------------------- */
 const State = {
   section: 'trending',
-  trending: { period: 'week', type: 'all',       genre: 'all' },
-  movies:   { category: 'top_rated',              genre: 'all' },
-  tv:       { category: 'top_rated',              genre: 'all' },
+  trending: {
+    window: 'week', type: 'all',
+    releaseType: 'released', period: 'month', platform: 'all', genre: 'all',
+  },
+  movies: {
+    sort: 'rating',
+    releaseType: 'released', period: 'month', platform: 'all', genre: 'all',
+  },
+  tv: {
+    sort: 'rating',
+    releaseType: 'released', period: 'month', platform: 'all', genre: 'all',
+  },
   releases: {
     releaseType: 'released',  // 'released' | 'theaters' | 'upcoming'
     period:      'month',     // 'week' | 'month' | '3months' | 'year'
@@ -107,13 +116,99 @@ async function handleSaveKey() {
    --------------------------------------------------------------- */
 function launchApp() {
   hideSetupModal();
-  initGenreButtons();
+  initFilters();
   bindAppEvents();
   navigateTo('trending');
 }
 
 /* ---------------------------------------------------------------
-   Genre buttons — generated from CONFIG.GENRE_FILTERS
+   Release-type / period / platform filter definitions
+   --------------------------------------------------------------- */
+const RELEASE_TYPE_DEFS = [
+  { id: 'released', label: 'Available Now', sub: 'Streaming &amp; Disc', icon: 'fa-play-circle' },
+  { id: 'theaters', label: 'In Theaters',   sub: 'Currently in cinemas', icon: 'fa-film' },
+  { id: 'upcoming', label: 'Coming Soon',   sub: 'Not yet released',     icon: 'fa-calendar-alt' },
+];
+
+const PLATFORM_DEFS = [
+  { id: 'all',    html: '<i class="fas fa-globe"></i> All' },
+  { id: '8',      html: '<span class="pf-icon netflix">N</span> Netflix' },
+  { id: '337',    html: '<span class="pf-icon disney">D+</span> Disney+' },
+  { id: '1899',   html: '<span class="pf-icon max">M</span> Max' },
+  { id: '15',     html: '<span class="pf-icon hulu">H</span> Hulu' },
+  { id: '9',      html: '<span class="pf-icon prime">P</span> Prime Video' },
+  { id: '350',    html: '<span class="pf-icon apple">A</span> Apple TV+' },
+  { id: '386',    html: '<span class="pf-icon peacock">🦚</span> Peacock' },
+  { id: 'bluray', html: '<i class="fas fa-compact-disc"></i> Blu-Ray / DVD' },
+];
+
+/* ---------------------------------------------------------------
+   buildSectionFilters — dynamically populates release-type tabs,
+   period buttons, and platform buttons for a given section prefix.
+   Each section's buttons are fully independent (scoped to their
+   own containers) and update only their own State subtree.
+   --------------------------------------------------------------- */
+function buildSectionFilters(prefix, state, onLoad) {
+  // Release type tabs
+  const rtRow = el(`${prefix}-rtype-row`);
+  if (rtRow) {
+    RELEASE_TYPE_DEFS.forEach(rt => {
+      const btn = document.createElement('button');
+      btn.className = 'release-type-btn' + (rt.id === state.releaseType ? ' active' : '');
+      btn.dataset.rtype = rt.id;
+      btn.innerHTML = `<i class="fas ${rt.icon}"></i><span class="rtype-label">${rt.label}</span><span class="rtype-sub">${rt.sub}</span>`;
+      btn.addEventListener('click', () => {
+        $$('.release-type-btn', rtRow).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.releaseType = rt.id;
+        updateSectionFilterVisibility(prefix, rt.id);
+        onLoad(true);
+      });
+      rtRow.appendChild(btn);
+    });
+  }
+
+  // Period buttons
+  const periodBtns = el(`${prefix}-period-btns`);
+  if (periodBtns) {
+    CONFIG.RELEASE_PERIODS.forEach(p => {
+      const btn = document.createElement('button');
+      btn.className = 'period-btn' + (p.id === state.period ? ' active' : '');
+      btn.dataset.period = p.id;
+      btn.textContent = p.label;
+      btn.addEventListener('click', () => {
+        $$('.period-btn', periodBtns).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.period = p.id;
+        onLoad(true);
+      });
+      periodBtns.appendChild(btn);
+    });
+  }
+
+  // Platform buttons
+  const platformBtns = el(`${prefix}-platform-btns`);
+  if (platformBtns) {
+    PLATFORM_DEFS.forEach(pf => {
+      const btn = document.createElement('button');
+      btn.className = 'platform-btn' + (pf.id === state.platform ? ' active' : '');
+      btn.dataset.platform = pf.id;
+      btn.innerHTML = pf.html;
+      btn.addEventListener('click', () => {
+        $$('.platform-btn', platformBtns).forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.platform = pf.id;
+        onLoad(true);
+      });
+      platformBtns.appendChild(btn);
+    });
+  }
+
+  updateSectionFilterVisibility(prefix, state.releaseType);
+}
+
+/* ---------------------------------------------------------------
+   Genre buttons — generated from CONFIG.GENRE_FILTERS.
    buildGenreButtons() is called once per section container.
    Each container manages its own active state independently.
    --------------------------------------------------------------- */
@@ -134,32 +229,26 @@ function buildGenreButtons(containerId, onSelect) {
   });
 }
 
-function initGenreButtons() {
-  buildGenreButtons('trending-genre-row', id => {
-    State.trending.genre = id;
-    loadTrending(true);
-  });
-  buildGenreButtons('movies-genre-row', id => {
-    State.movies.genre = id;
-    loadMovies(true);
-  });
-  buildGenreButtons('tv-genre-row', id => {
-    State.tv.genre = id;
-    loadTV(true);
-  });
-  buildGenreButtons('genre-filter-row', id => {
-    State.releases.genre = id;
-    loadReleases(true);
-  });
+function initFilters() {
+  buildSectionFilters('trending', State.trending, loadTrending);
+  buildSectionFilters('movies',   State.movies,   loadMovies);
+  buildSectionFilters('tv',       State.tv,       loadTV);
+
+  buildGenreButtons('trending-genre-row', id => { State.trending.genre = id; loadTrending(true); });
+  buildGenreButtons('movies-genre-row',   id => { State.movies.genre   = id; loadMovies(true);   });
+  buildGenreButtons('tv-genre-row',       id => { State.tv.genre       = id; loadTV(true);       });
+  buildGenreButtons('genre-filter-row',   id => { State.releases.genre = id; loadReleases(true); });
 }
 
 /* ---------------------------------------------------------------
    Show/hide period + platform rows based on release type
    --------------------------------------------------------------- */
-function updateReleasesFilterVisibility() {
-  const isReleased = State.releases.releaseType === 'released';
-  el('releases-period-row').classList.toggle('hidden', !isReleased);
-  el('releases-platform-row').classList.toggle('hidden', !isReleased);
+function updateSectionFilterVisibility(prefix, releaseType) {
+  const isReleased = releaseType === 'released';
+  const periodRow   = el(`${prefix}-period-row`);
+  const platformRow = el(`${prefix}-platform-row`);
+  if (periodRow)   periodRow.classList.toggle('hidden', !isReleased);
+  if (platformRow) platformRow.classList.toggle('hidden', !isReleased);
 }
 
 /* ---------------------------------------------------------------
@@ -206,12 +295,12 @@ function bindAppEvents() {
     navigateTo('trending');
   });
 
-  // Trending toggles — period
+  // Trending toggles — time window
   $$('.toggle-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       $$('.toggle-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      State.trending.period = btn.dataset.period;
+      State.trending.window = btn.dataset.window;
       loadTrending(true);
     });
   });
@@ -226,51 +315,52 @@ function bindAppEvents() {
     });
   });
 
-  // Movie category buttons
-  $$('.movie-cat-btn').forEach(btn => {
+  // Movies sort buttons
+  $$('.movies-sort-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      $$('.movie-cat-btn').forEach(b => b.classList.remove('active'));
+      $$('.movies-sort-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      State.movies.category = btn.dataset.cat;
+      State.movies.sort = btn.dataset.sort;
       loadMovies(true);
     });
   });
 
-  // TV category buttons
-  $$('.tv-cat-btn').forEach(btn => {
+  // TV sort buttons
+  $$('.tv-sort-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      $$('.tv-cat-btn').forEach(b => b.classList.remove('active'));
+      $$('.tv-sort-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      State.tv.category = btn.dataset.cat;
+      State.tv.sort = btn.dataset.sort;
       loadTV(true);
     });
   });
 
-  // Platform filter buttons
-  $$('.platform-btn').forEach(btn => {
+  // New Releases section: platform, release-type, period (scoped to avoid
+  // conflicting with the same classes dynamically built in other sections)
+  const releasesSection = el('releases-section');
+
+  $$('.platform-btn', releasesSection).forEach(btn => {
     btn.addEventListener('click', () => {
-      $$('.platform-btn').forEach(b => b.classList.remove('active'));
+      $$('.platform-btn', releasesSection).forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       State.releases.platform = btn.dataset.platform;
       loadReleases(true);
     });
   });
 
-  // Release type tabs (Available Now / In Theaters / Coming Soon)
-  $$('.release-type-btn').forEach(btn => {
+  $$('.release-type-btn', releasesSection).forEach(btn => {
     btn.addEventListener('click', () => {
-      $$('.release-type-btn').forEach(b => b.classList.remove('active'));
+      $$('.release-type-btn', releasesSection).forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       State.releases.releaseType = btn.dataset.rtype;
-      updateReleasesFilterVisibility();
+      updateSectionFilterVisibility('releases', btn.dataset.rtype);
       loadReleases(true);
     });
   });
 
-  // Release period buttons (Last Week / Last Month / …)
-  $$('.period-btn').forEach(btn => {
+  $$('.period-btn', releasesSection).forEach(btn => {
     btn.addEventListener('click', () => {
-      $$('.period-btn').forEach(b => b.classList.remove('active'));
+      $$('.period-btn', releasesSection).forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       State.releases.period = btn.dataset.period;
       loadReleases(true);
@@ -313,34 +403,113 @@ async function loadTrending(force = false) {
   setLoading(spinner, true);
   grid.innerHTML = '';
 
-  const { type, period, genre } = State.trending;
+  const { window: timeWindow, type, releaseType, period, platform, genre } = State.trending;
   const genreConf  = CONFIG.GENRE_FILTERS.find(g => g.id === genre) || CONFIG.GENRE_FILTERS[0];
   const movieGenre = genreConf.movieId ? String(genreConf.movieId) : undefined;
   const tvGenre    = genreConf.tvId    ? String(genreConf.tvId)    : undefined;
+  const today = new Date();
+  const fmt   = d => d.toISOString().split('T')[0];
 
   try {
     let items;
 
-    if (!movieGenre && !tvGenre) {
-      // No genre filter — use the native trending endpoint (sorted by trend strength)
-      const data = await API.trending(type, period);
-      items = (data.results || []).filter(
-        i => i.media_type === 'movie' || i.media_type === 'tv'
-      );
-    } else {
-      // Genre filter — approximate trending via discover/popularity
+    if (releaseType === 'theaters') {
+      // In Theaters / On The Air
       let movieItems = [];
       let tvItems    = [];
-
-      if ((type === 'movie' || type === 'all') && movieGenre) {
-        const data = await API.discoverMovies({ sort_by: 'popularity.desc', with_genres: movieGenre });
-        movieItems = (data.results || []).map(m => ({ ...m, media_type: 'movie' }));
+      if (type === 'movie' || type === 'all') {
+        const data = movieGenre
+          ? await API.discoverMovies({
+              sort_by: 'popularity.desc',
+              'primary_release_date.gte': fmt(new Date(today.getTime() - 30 * MS_PER_DAY)),
+              'primary_release_date.lte': fmt(today),
+              with_genres: movieGenre,
+            })
+          : await API.movies('now_playing');
+        movieItems = (data.results || []).map(m => ({ ...m, media_type: 'movie', release_label: '🎥 In Theaters' }));
       }
-      if ((type === 'tv' || type === 'all') && tvGenre) {
-        const data = await API.discoverTV({ sort_by: 'popularity.desc', with_genres: tvGenre });
-        tvItems = (data.results || []).map(s => ({ ...s, media_type: 'tv' }));
+      if (type === 'tv' || type === 'all') {
+        const data = tvGenre
+          ? await API.discoverTV({ sort_by: 'popularity.desc', with_genres: tvGenre })
+          : await API.tvShows('on_the_air');
+        tvItems = (data.results || []).map(s => ({ ...s, media_type: 'tv', release_label: '📺 On The Air' }));
       }
       items = [...movieItems, ...tvItems].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+    } else if (releaseType === 'upcoming') {
+      // Coming Soon — next 90 days
+      const tomorrow  = new Date(today.getTime() + MS_PER_DAY);
+      const ninetyOut = new Date(today.getTime() + 90 * MS_PER_DAY);
+      let movieItems = [];
+      let tvItems    = [];
+      if (type === 'movie' || type === 'all') {
+        const data = await API.discoverMovies({
+          'primary_release_date.gte': fmt(tomorrow),
+          'primary_release_date.lte': fmt(ninetyOut),
+          sort_by: 'popularity.desc',
+          ...(movieGenre ? { with_genres: movieGenre } : {}),
+        });
+        movieItems = (data.results || []).map(m => ({ ...m, media_type: 'movie', release_label: '📅 Coming Soon' }));
+      }
+      if (type === 'tv' || type === 'all') {
+        const data = await API.discoverTV({
+          'first_air_date.gte': fmt(tomorrow),
+          'first_air_date.lte': fmt(ninetyOut),
+          sort_by: 'popularity.desc',
+          ...(tvGenre ? { with_genres: tvGenre } : {}),
+        });
+        tvItems = (data.results || []).map(s => ({ ...s, media_type: 'tv', release_label: '📅 Coming Soon' }));
+      }
+      items = [...movieItems, ...tvItems].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+    } else {
+      // Available Now — use native trending unless platform/genre filters are active
+      const useNative = genre === 'all' && platform === 'all';
+
+      if (useNative) {
+        const data = await API.trending(type, timeWindow);
+        items = (data.results || []).filter(
+          i => i.media_type === 'movie' || i.media_type === 'tv'
+        );
+      } else {
+        const periodConf    = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
+        const since         = new Date(today.getTime() - periodConf.days * MS_PER_DAY);
+        const providerExtra = platform === 'all' ? {} : { with_watch_providers: platform, watch_region: CONFIG.REGION };
+        let movieItems = [];
+        let tvItems    = [];
+
+        if (type === 'movie' || type === 'all') {
+          if (platform === 'bluray') {
+            const data = await API.discoverMovies({
+              'primary_release_date.gte': fmt(new Date(today.getTime() - 180 * MS_PER_DAY)),
+              'primary_release_date.lte': fmt(new Date(today.getTime() - 42  * MS_PER_DAY)),
+              sort_by: 'popularity.desc',
+              ...(movieGenre ? { with_genres: movieGenre } : {}),
+            });
+            movieItems = (data.results || []).map(m => ({ ...m, media_type: 'movie', release_label: '📀 Blu-Ray / DVD' }));
+          } else {
+            const data = await API.discoverMovies({
+              'primary_release_date.gte': fmt(since),
+              'primary_release_date.lte': fmt(today),
+              sort_by: 'popularity.desc',
+              ...(movieGenre ? { with_genres: movieGenre } : {}),
+              ...providerExtra,
+            });
+            movieItems = (data.results || []).map(m => ({ ...m, media_type: 'movie' }));
+          }
+        }
+        if ((type === 'tv' || type === 'all') && platform !== 'bluray') {
+          const data = await API.discoverTV({
+            'first_air_date.gte': fmt(since),
+            'first_air_date.lte': fmt(today),
+            sort_by: 'popularity.desc',
+            ...(tvGenre ? { with_genres: tvGenre } : {}),
+            ...providerExtra,
+          });
+          tvItems = (data.results || []).map(s => ({ ...s, media_type: 'tv' }));
+        }
+        items = [...movieItems, ...tvItems].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+      }
     }
 
     if (items.length > 0) renderHero(items[0]);
@@ -361,36 +530,70 @@ async function loadMovies(force = false) {
   setLoading(spinner, true);
   grid.innerHTML = '';
 
-  const { category, genre } = State.movies;
+  const { sort, releaseType, period, platform, genre } = State.movies;
   const genreConf  = CONFIG.GENRE_FILTERS.find(g => g.id === genre) || CONFIG.GENRE_FILTERS[0];
   const movieGenre = genreConf.movieId ? String(genreConf.movieId) : undefined;
+  const today      = new Date();
+  const fmt        = d => d.toISOString().split('T')[0];
+  const sortBy     = sort === 'rating' ? 'vote_average.desc' : 'popularity.desc';
+  const minVotes   = sort === 'rating' ? 200 : undefined;
 
   try {
     let data;
-    if (movieGenre) {
-      // Genre is set — use discover so we can filter + sort by rating
-      const today = new Date();
-      const fmt   = d => d.toISOString().split('T')[0];
-      let params  = { with_genres: movieGenre };
 
-      if (category === 'top_rated' || category === 'popular') {
-        params.sort_by = category === 'top_rated' ? 'vote_average.desc' : 'popularity.desc';
-        if (category === 'top_rated') params['vote_count.gte'] = 200;
-      } else if (category === 'upcoming') {
-        const tomorrow = new Date(today.getTime() + MS_PER_DAY);
-        params.sort_by = 'primary_release_date.asc';
-        params['primary_release_date.gte'] = fmt(tomorrow);
-        params['primary_release_date.lte'] = fmt(new Date(today.getTime() + 90 * MS_PER_DAY));
-      } else if (category === 'now_playing') {
-        params.sort_by = 'popularity.desc';
-        params['primary_release_date.gte'] = fmt(new Date(today.getTime() - 30 * MS_PER_DAY));
-        params['primary_release_date.lte'] = fmt(today);
+    if (releaseType === 'theaters') {
+      // Now playing movies
+      if (movieGenre || sort === 'rating') {
+        data = await API.discoverMovies({
+          sort_by: sortBy,
+          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
+          ...(movieGenre ? { with_genres: movieGenre } : {}),
+          'primary_release_date.gte': fmt(new Date(today.getTime() - 30 * MS_PER_DAY)),
+          'primary_release_date.lte': fmt(today),
+        });
+      } else {
+        data = await API.movies('now_playing');
       }
-      data = await API.discoverMovies(params);
+
+    } else if (releaseType === 'upcoming') {
+      // Coming soon
+      const tomorrow  = new Date(today.getTime() + MS_PER_DAY);
+      const ninetyOut = new Date(today.getTime() + 90 * MS_PER_DAY);
+      data = await API.discoverMovies({
+        'primary_release_date.gte': fmt(tomorrow),
+        'primary_release_date.lte': fmt(ninetyOut),
+        sort_by: 'primary_release_date.asc',
+        ...(movieGenre ? { with_genres: movieGenre } : {}),
+      });
+
     } else {
-      // No genre filter — use the standard rated/popular endpoint
-      data = await API.movies(category);
+      // Available Now
+      if (platform === 'bluray') {
+        data = await API.discoverMovies({
+          'primary_release_date.gte': fmt(new Date(today.getTime() - 180 * MS_PER_DAY)),
+          'primary_release_date.lte': fmt(new Date(today.getTime() - 42  * MS_PER_DAY)),
+          sort_by: sortBy,
+          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
+          ...(movieGenre ? { with_genres: movieGenre } : {}),
+        });
+      } else if (movieGenre || platform !== 'all') {
+        const periodConf    = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
+        const since         = new Date(today.getTime() - periodConf.days * MS_PER_DAY);
+        const providerExtra = platform === 'all' ? {} : { with_watch_providers: platform, watch_region: CONFIG.REGION };
+        data = await API.discoverMovies({
+          'primary_release_date.gte': fmt(since),
+          'primary_release_date.lte': fmt(today),
+          sort_by: sortBy,
+          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
+          ...(movieGenre ? { with_genres: movieGenre } : {}),
+          ...providerExtra,
+        });
+      } else {
+        // No filters — standard endpoint
+        data = await API.movies(sort === 'rating' ? 'top_rated' : 'popular');
+      }
     }
+
     renderGrid((data.results || []).map(m => ({ ...m, media_type: 'movie' })), grid);
   } catch (err) {
     handleError(err, grid);
@@ -408,34 +611,63 @@ async function loadTV(force = false) {
   setLoading(spinner, true);
   grid.innerHTML = '';
 
-  const { category, genre } = State.tv;
+  const { sort, releaseType, period, platform, genre } = State.tv;
   const genreConf = CONFIG.GENRE_FILTERS.find(g => g.id === genre) || CONFIG.GENRE_FILTERS[0];
   const tvGenre   = genreConf.tvId ? String(genreConf.tvId) : undefined;
+  const today     = new Date();
+  const fmt       = d => d.toISOString().split('T')[0];
+  const sortBy    = sort === 'rating' ? 'vote_average.desc' : 'popularity.desc';
+  const minVotes  = sort === 'rating' ? 200 : undefined;
 
   try {
     let data;
-    if (tvGenre) {
-      // Genre is set — use discover so we can filter + sort by rating
-      const today = new Date();
-      const fmt   = d => d.toISOString().split('T')[0];
-      let params  = { with_genres: tvGenre };
 
-      if (category === 'top_rated') {
-        params.sort_by = 'vote_average.desc';
-        params['vote_count.gte'] = 200;
-      } else if (category === 'on_the_air' || category === 'airing_today') {
-        // Approximate: currently airing shows with genre, sorted by popularity
-        params.sort_by = 'popularity.desc';
-        params['air_date.lte'] = fmt(today);
-        params['air_date.gte'] = fmt(new Date(today.getTime() - (category === 'airing_today' ? 1 : 7) * MS_PER_DAY));
+    if (releaseType === 'theaters') {
+      // On the air TV shows
+      if (tvGenre || sort === 'rating') {
+        data = await API.discoverTV({
+          sort_by: sortBy,
+          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
+          ...(tvGenre ? { with_genres: tvGenre } : {}),
+        });
       } else {
-        params.sort_by = 'popularity.desc';
+        data = await API.tvShows('on_the_air');
       }
-      data = await API.discoverTV(params);
+
+    } else if (releaseType === 'upcoming') {
+      // Coming soon TV
+      const tomorrow  = new Date(today.getTime() + MS_PER_DAY);
+      const ninetyOut = new Date(today.getTime() + 90 * MS_PER_DAY);
+      data = await API.discoverTV({
+        'first_air_date.gte': fmt(tomorrow),
+        'first_air_date.lte': fmt(ninetyOut),
+        sort_by: 'first_air_date.asc',
+        ...(tvGenre ? { with_genres: tvGenre } : {}),
+      });
+
     } else {
-      // No genre filter — use the standard rated/popular endpoint
-      data = await API.tvShows(category);
+      // Available Now
+      if (platform === 'bluray') {
+        // Blu-ray is movies-only; fall back to standard TV endpoint
+        data = await API.tvShows(sort === 'rating' ? 'top_rated' : 'popular');
+      } else if (tvGenre || platform !== 'all') {
+        const periodConf    = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
+        const since         = new Date(today.getTime() - periodConf.days * MS_PER_DAY);
+        const providerExtra = platform === 'all' ? {} : { with_watch_providers: platform, watch_region: CONFIG.REGION };
+        data = await API.discoverTV({
+          'first_air_date.gte': fmt(since),
+          'first_air_date.lte': fmt(today),
+          sort_by: sortBy,
+          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
+          ...(tvGenre ? { with_genres: tvGenre } : {}),
+          ...providerExtra,
+        });
+      } else {
+        // No filters — standard endpoint
+        data = await API.tvShows(sort === 'rating' ? 'top_rated' : 'popular');
+      }
     }
+
     renderGrid((data.results || []).map(s => ({ ...s, media_type: 'tv' })), grid);
   } catch (err) {
     handleError(err, grid);
@@ -787,6 +1019,8 @@ function closeDetailModal() {
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
+  // Clear content to stop any playing trailer
+  el('detail-body').innerHTML = '';
 }
 
 function renderDetailModal(d, mediaType) {
@@ -856,8 +1090,31 @@ function renderDetailModal(d, mediaType) {
     : `https://www.imdb.com/find?q=${encodeURIComponent(title)}&s=tt`;
   const rtUrl   = `https://www.rottentomatoes.com/search?search=${encodeURIComponent(title)}`;
 
-  // Overview
-  const overview = d.overview || 'No overview available.';
+  // Trailer (YouTube — first official trailer, fallback to any YouTube video)
+  // Single-pass: priority order official Trailer > Trailer > any YouTube
+  const videos = d.videos?.results || [];
+  let trailer = null;
+  for (const v of videos) {
+    if (v.site !== 'YouTube') continue;
+    if (v.type === 'Trailer' && v.official) { trailer = v; break; }
+    if (v.type === 'Trailer' && !trailer)   { trailer = v; }
+    else if (!trailer)                       { trailer = v; }
+  }
+  // Only embed keys that look like valid YouTube IDs (alphanumeric, - _)
+  const safeKey = trailer && /^[\w-]{6,20}$/.test(trailer.key) ? trailer.key : null;
+  const trailerHTML = safeKey
+    ? `<div class="detail-trailer">
+         <h3 class="streaming-title"><i class="fab fa-youtube"></i> Trailer</h3>
+         <div class="trailer-wrap">
+           <iframe
+             src="https://www.youtube-nocookie.com/embed/${safeKey}?rel=0"
+             title="${escHtml(trailer.name || 'Trailer')}"
+             loading="lazy"
+             allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
+             allowfullscreen></iframe>
+         </div>
+       </div>`
+    : '';
 
   // Status
   const status = d.status || '';
@@ -903,6 +1160,9 @@ function renderDetailModal(d, mediaType) {
 
         <!-- Overview -->
         <p class="detail-overview">${escHtml(overview)}</p>
+
+        <!-- Trailer -->
+        ${trailerHTML}
 
         <!-- Streaming -->
         ${flatrate.length || rent.length || buy.length ? `

@@ -210,8 +210,8 @@
           </h2>
           <div class="btn-row">
             <div class="btn-group" role="group" aria-label="Time window">
-              <button class="toggle-btn active" data-period="week">This Week</button>
-              <button class="toggle-btn"        data-period="day">Today</button>
+              <button class="toggle-btn active" data-window="week">This Week</button>
+              <button class="toggle-btn"        data-window="day">Today</button>
             </div>
             <div class="btn-group" role="group" aria-label="Media type">
               <button class="type-btn active" data-type="all">All</button>
@@ -219,6 +219,16 @@
               <button class="type-btn"        data-type="tv">TV Shows</button>
             </div>
           </div>
+        </div>
+        <!-- Release type, period, platform — populated by buildSectionFilters() -->
+        <div id="trending-rtype-row" class="release-type-row" role="group" aria-label="Select release type"></div>
+        <div id="trending-period-row" class="filter-row hidden" role="group" aria-label="Release period">
+          <span class="filter-row-label">Period</span>
+          <div id="trending-period-btns" class="btn-group"></div>
+        </div>
+        <div id="trending-platform-row" class="filter-row hidden" aria-label="Platform filter">
+          <span class="filter-row-label">Platform</span>
+          <div id="trending-platform-btns" class="platform-filters" role="group"></div>
         </div>
         <div class="filter-row" aria-label="Genre filter">
           <span class="filter-row-label">Genre</span>
@@ -236,12 +246,20 @@
           <h2 class="section-title">
             <i class="fas fa-ticket"></i> Movies
           </h2>
-          <div class="btn-group" role="group" aria-label="Movie category">
-            <button class="movie-cat-btn"        data-cat="popular">Popular</button>
-            <button class="movie-cat-btn"        data-cat="now_playing">In Theaters</button>
-            <button class="movie-cat-btn"        data-cat="upcoming">Upcoming</button>
-            <button class="movie-cat-btn active" data-cat="top_rated">Top Rated</button>
+          <div class="btn-group" role="group" aria-label="Sort movies by">
+            <button class="movies-sort-btn active" data-sort="rating">Top Rated</button>
+            <button class="movies-sort-btn"        data-sort="popularity">Popular</button>
           </div>
+        </div>
+        <!-- Release type, period, platform — populated by buildSectionFilters() -->
+        <div id="movies-rtype-row" class="release-type-row" role="group" aria-label="Select release type"></div>
+        <div id="movies-period-row" class="filter-row hidden" role="group" aria-label="Release period">
+          <span class="filter-row-label">Period</span>
+          <div id="movies-period-btns" class="btn-group"></div>
+        </div>
+        <div id="movies-platform-row" class="filter-row hidden" aria-label="Platform filter">
+          <span class="filter-row-label">Platform</span>
+          <div id="movies-platform-btns" class="platform-filters" role="group"></div>
         </div>
         <div class="filter-row" aria-label="Genre filter">
           <span class="filter-row-label">Genre</span>
@@ -259,12 +277,20 @@
           <h2 class="section-title">
             <i class="fas fa-tv"></i> TV Shows
           </h2>
-          <div class="btn-group" role="group" aria-label="TV category">
-            <button class="tv-cat-btn"        data-cat="popular">Popular</button>
-            <button class="tv-cat-btn"        data-cat="on_the_air">On The Air</button>
-            <button class="tv-cat-btn"        data-cat="airing_today">Airing Today</button>
-            <button class="tv-cat-btn active" data-cat="top_rated">Top Rated</button>
+          <div class="btn-group" role="group" aria-label="Sort TV shows by">
+            <button class="tv-sort-btn active" data-sort="rating">Top Rated</button>
+            <button class="tv-sort-btn"        data-sort="popularity">Popular</button>
           </div>
+        </div>
+        <!-- Release type, period, platform — populated by buildSectionFilters() -->
+        <div id="tv-rtype-row" class="release-type-row" role="group" aria-label="Select release type"></div>
+        <div id="tv-period-row" class="filter-row hidden" role="group" aria-label="Release period">
+          <span class="filter-row-label">Period</span>
+          <div id="tv-period-btns" class="btn-group"></div>
+        </div>
+        <div id="tv-platform-row" class="filter-row hidden" aria-label="Platform filter">
+          <span class="filter-row-label">Platform</span>
+          <div id="tv-platform-btns" class="platform-filters" role="group"></div>
         </div>
         <div class="filter-row" aria-label="Genre filter">
           <span class="filter-row-label">Genre</span>
