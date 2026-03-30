@@ -892,12 +892,10 @@ function renderHero(item) {
   overview.textContent = item.overview || '';
 
   // Rating
-  const score = item.vote_average || 0;
-  const pct   = Math.round(score * 10);
-  const cls   = ratingClass(pct);
+  const { pct, cls, label: ratingLabel } = computeRating(item.vote_average, item.vote_count);
   ratings.innerHTML = `
     <div class="rating-badge ${cls}" title="TMDB Score">
-      <span class="rating-num">${pct}%</span>
+      <span class="rating-num">${ratingLabel}</span>
       <span class="rating-label">TMDB</span>
     </div>
     <a href="https://www.rottentomatoes.com/search?search=${encodeURIComponent(itemTitle)}"
@@ -947,8 +945,8 @@ function createCard(item) {
   const itemDate  = item.release_date || item.first_air_date || '';
   const yearStr   = itemDate ? itemDate.slice(0, 4) : '—';
   const score     = item.vote_average || 0;
-  const pct       = Math.round(score * 10);
-  const cls       = ratingClass(pct);
+  const voteCount = item.vote_count   || 0;
+  const { pct, cls, label: ratingLabel } = computeRating(score, voteCount);
   const posterSrc = API.posterUrl(item.poster_path);
 
   const div = document.createElement('div');
@@ -965,7 +963,7 @@ function createCard(item) {
         ? `<img src="${posterSrc}" alt="${escHtml(itemTitle)}" loading="lazy">`
         : `<div class="card-no-poster"><i class="fas fa-film"></i></div>`
       }
-      <div class="card-rating ${cls}">${pct}<span>%</span></div>
+      <div class="card-rating ${cls}">${ratingLabel}</div>
       <div class="card-type-badge">${isMovie ? '🎬' : '📺'}</div>
     </div>
     <div class="card-body">
@@ -1025,9 +1023,7 @@ function renderDetailModal(d, mediaType) {
   const isMovie = mediaType === 'movie';
   const title   = d.title || d.name || 'Unknown';
   const year    = (d.release_date || d.first_air_date || '').slice(0, 4);
-  const score   = d.vote_average || 0;
-  const pct     = Math.round(score * 10);
-  const cls     = ratingClass(pct);
+  const { pct, cls, label: ratingLabel } = computeRating(d.vote_average, d.vote_count);
 
   // Runtime
   let runtime = '';
@@ -1145,7 +1141,7 @@ function renderDetailModal(d, mediaType) {
                 d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831"/>
             </svg>
             <div class="rating-text">
-              <span class="rating-pct">${pct}%</span>
+              <span class="rating-pct">${ratingLabel}</span>
               <span class="rating-src">TMDB</span>
             </div>
           </div>
@@ -1221,6 +1217,21 @@ function ratingClass(pct) {
   if (pct >= 40) return 'rating-yellow';
   if (pct  > 0)  return 'rating-red';
   return 'rating-none';
+}
+
+/**
+ * Compute a display-safe rating from TMDB vote_average + vote_count.
+ * Titles with fewer than MIN_VOTES are treated as "not rated" to avoid
+ * misleading 100% scores from 1-2 votes on unknown titles.
+ * @returns {{ pct: number, cls: string, label: string, rated: boolean }}
+ */
+const MIN_RATING_VOTES = 10;
+function computeRating(voteAvg, voteCount) {
+  if (voteCount == null || voteCount < MIN_RATING_VOTES) {
+    return { pct: 0, cls: 'rating-none', label: 'N/R', rated: false };
+  }
+  const pct = Math.round((voteAvg || 0) * 10);
+  return { pct, cls: ratingClass(pct), label: `${pct}%`, rated: true };
 }
 
 function setLoading(spinnerEl, visible) {
