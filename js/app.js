@@ -12,9 +12,9 @@ const MS_PER_DAY = 86_400_000;
    --------------------------------------------------------------- */
 const State = {
   section: 'trending',
-  trending: { period: 'week', type: 'all' },
-  movies:   { category: 'popular' },
-  tv:       { category: 'popular' },
+  trending: { period: 'week', type: 'all',       genre: 'all' },
+  movies:   { category: 'top_rated',              genre: 'all' },
+  tv:       { category: 'top_rated',              genre: 'all' },
   releases: {
     releaseType: 'released',  // 'released' | 'theaters' | 'upcoming'
     period:      'month',     // 'week' | 'month' | '3months' | 'year'
@@ -114,9 +114,11 @@ function launchApp() {
 
 /* ---------------------------------------------------------------
    Genre buttons — generated from CONFIG.GENRE_FILTERS
+   buildGenreButtons() is called once per section container.
+   Each container manages its own active state independently.
    --------------------------------------------------------------- */
-function initGenreButtons() {
-  const container = el('genre-filter-row');
+function buildGenreButtons(containerId, onSelect) {
+  const container = el(containerId);
   if (!container) return;
   CONFIG.GENRE_FILTERS.forEach(g => {
     const btn = document.createElement('button');
@@ -124,12 +126,30 @@ function initGenreButtons() {
     btn.dataset.genre = g.id;
     btn.textContent = g.label;
     btn.addEventListener('click', () => {
-      $$('.genre-btn').forEach(b => b.classList.remove('active'));
+      $$('.genre-btn', container).forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      State.releases.genre = g.id;
-      loadReleases(true);
+      onSelect(g.id);
     });
     container.appendChild(btn);
+  });
+}
+
+function initGenreButtons() {
+  buildGenreButtons('trending-genre-row', id => {
+    State.trending.genre = id;
+    loadTrending(true);
+  });
+  buildGenreButtons('movies-genre-row', id => {
+    State.movies.genre = id;
+    loadMovies(true);
+  });
+  buildGenreButtons('tv-genre-row', id => {
+    State.tv.genre = id;
+    loadTV(true);
+  });
+  buildGenreButtons('genre-filter-row', id => {
+    State.releases.genre = id;
+    loadReleases(true);
   });
 }
 
@@ -285,7 +305,7 @@ function bindAppEvents() {
    --------------------------------------------------------------- */
 
 async function loadTrending(force = false) {
-  const grid  = el('trending-grid');
+  const grid    = el('trending-grid');
   const spinner = el('trending-loading');
 
   if (!force && grid.children.length > 0) return;
@@ -293,11 +313,35 @@ async function loadTrending(force = false) {
   setLoading(spinner, true);
   grid.innerHTML = '';
 
+  const { type, period, genre } = State.trending;
+  const genreConf  = CONFIG.GENRE_FILTERS.find(g => g.id === genre) || CONFIG.GENRE_FILTERS[0];
+  const movieGenre = genreConf.movieId ? String(genreConf.movieId) : undefined;
+  const tvGenre    = genreConf.tvId    ? String(genreConf.tvId)    : undefined;
+
   try {
-    const data = await API.trending(State.trending.type, State.trending.period);
-    const items = (data.results || []).filter(
-      i => i.media_type === 'movie' || i.media_type === 'tv'
-    );
+    let items;
+
+    if (!movieGenre && !tvGenre) {
+      // No genre filter — use the native trending endpoint (sorted by trend strength)
+      const data = await API.trending(type, period);
+      items = (data.results || []).filter(
+        i => i.media_type === 'movie' || i.media_type === 'tv'
+      );
+    } else {
+      // Genre filter — approximate trending via discover/popularity
+      let movieItems = [];
+      let tvItems    = [];
+
+      if ((type === 'movie' || type === 'all') && movieGenre) {
+        const data = await API.discoverMovies({ sort_by: 'popularity.desc', with_genres: movieGenre });
+        movieItems = (data.results || []).map(m => ({ ...m, media_type: 'movie' }));
+      }
+      if ((type === 'tv' || type === 'all') && tvGenre) {
+        const data = await API.discoverTV({ sort_by: 'popularity.desc', with_genres: tvGenre });
+        tvItems = (data.results || []).map(s => ({ ...s, media_type: 'tv' }));
+      }
+      items = [...movieItems, ...tvItems].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    }
 
     if (items.length > 0) renderHero(items[0]);
     renderGrid(items, grid);
@@ -317,8 +361,36 @@ async function loadMovies(force = false) {
   setLoading(spinner, true);
   grid.innerHTML = '';
 
+  const { category, genre } = State.movies;
+  const genreConf  = CONFIG.GENRE_FILTERS.find(g => g.id === genre) || CONFIG.GENRE_FILTERS[0];
+  const movieGenre = genreConf.movieId ? String(genreConf.movieId) : undefined;
+
   try {
-    const data = await API.movies(State.movies.category);
+    let data;
+    if (movieGenre) {
+      // Genre is set — use discover so we can filter + sort by rating
+      const today = new Date();
+      const fmt   = d => d.toISOString().split('T')[0];
+      let params  = { with_genres: movieGenre };
+
+      if (category === 'top_rated' || category === 'popular') {
+        params.sort_by = category === 'top_rated' ? 'vote_average.desc' : 'popularity.desc';
+        if (category === 'top_rated') params['vote_count.gte'] = 200;
+      } else if (category === 'upcoming') {
+        const tomorrow = new Date(today.getTime() + MS_PER_DAY);
+        params.sort_by = 'primary_release_date.asc';
+        params['primary_release_date.gte'] = fmt(tomorrow);
+        params['primary_release_date.lte'] = fmt(new Date(today.getTime() + 90 * MS_PER_DAY));
+      } else if (category === 'now_playing') {
+        params.sort_by = 'popularity.desc';
+        params['primary_release_date.gte'] = fmt(new Date(today.getTime() - 30 * MS_PER_DAY));
+        params['primary_release_date.lte'] = fmt(today);
+      }
+      data = await API.discoverMovies(params);
+    } else {
+      // No genre filter — use the standard rated/popular endpoint
+      data = await API.movies(category);
+    }
     renderGrid((data.results || []).map(m => ({ ...m, media_type: 'movie' })), grid);
   } catch (err) {
     handleError(err, grid);
@@ -336,8 +408,34 @@ async function loadTV(force = false) {
   setLoading(spinner, true);
   grid.innerHTML = '';
 
+  const { category, genre } = State.tv;
+  const genreConf = CONFIG.GENRE_FILTERS.find(g => g.id === genre) || CONFIG.GENRE_FILTERS[0];
+  const tvGenre   = genreConf.tvId ? String(genreConf.tvId) : undefined;
+
   try {
-    const data = await API.tvShows(State.tv.category);
+    let data;
+    if (tvGenre) {
+      // Genre is set — use discover so we can filter + sort by rating
+      const today = new Date();
+      const fmt   = d => d.toISOString().split('T')[0];
+      let params  = { with_genres: tvGenre };
+
+      if (category === 'top_rated') {
+        params.sort_by = 'vote_average.desc';
+        params['vote_count.gte'] = 200;
+      } else if (category === 'on_the_air' || category === 'airing_today') {
+        // Approximate: currently airing shows with genre, sorted by popularity
+        params.sort_by = 'popularity.desc';
+        params['air_date.lte'] = fmt(today);
+        params['air_date.gte'] = fmt(new Date(today.getTime() - (category === 'airing_today' ? 1 : 7) * MS_PER_DAY));
+      } else {
+        params.sort_by = 'popularity.desc';
+      }
+      data = await API.discoverTV(params);
+    } else {
+      // No genre filter — use the standard rated/popular endpoint
+      data = await API.tvShows(category);
+    }
     renderGrid((data.results || []).map(s => ({ ...s, media_type: 'tv' })), grid);
   } catch (err) {
     handleError(err, grid);

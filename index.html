@@ -220,6 +220,10 @@
             </div>
           </div>
         </div>
+        <div class="filter-row" aria-label="Genre filter">
+          <span class="filter-row-label">Genre</span>
+          <div id="trending-genre-row" class="genre-filters" role="group" aria-label="Filter by genre"></div>
+        </div>
         <div id="trending-grid" class="cards-grid"></div>
         <div id="trending-loading" class="loading-state">
           <div class="spinner"></div><p>Loading trending content…</p>
@@ -233,11 +237,15 @@
             <i class="fas fa-ticket"></i> Movies
           </h2>
           <div class="btn-group" role="group" aria-label="Movie category">
-            <button class="movie-cat-btn active" data-cat="popular">Popular</button>
+            <button class="movie-cat-btn"        data-cat="popular">Popular</button>
             <button class="movie-cat-btn"        data-cat="now_playing">In Theaters</button>
             <button class="movie-cat-btn"        data-cat="upcoming">Upcoming</button>
-            <button class="movie-cat-btn"        data-cat="top_rated">Top Rated</button>
+            <button class="movie-cat-btn active" data-cat="top_rated">Top Rated</button>
           </div>
+        </div>
+        <div class="filter-row" aria-label="Genre filter">
+          <span class="filter-row-label">Genre</span>
+          <div id="movies-genre-row" class="genre-filters" role="group" aria-label="Filter by genre"></div>
         </div>
         <div id="movies-grid" class="cards-grid"></div>
         <div id="movies-loading" class="loading-state">
@@ -252,11 +260,15 @@
             <i class="fas fa-tv"></i> TV Shows
           </h2>
           <div class="btn-group" role="group" aria-label="TV category">
-            <button class="tv-cat-btn active" data-cat="popular">Popular</button>
+            <button class="tv-cat-btn"        data-cat="popular">Popular</button>
             <button class="tv-cat-btn"        data-cat="on_the_air">On The Air</button>
             <button class="tv-cat-btn"        data-cat="airing_today">Airing Today</button>
-            <button class="tv-cat-btn"        data-cat="top_rated">Top Rated</button>
+            <button class="tv-cat-btn active" data-cat="top_rated">Top Rated</button>
           </div>
+        </div>
+        <div class="filter-row" aria-label="Genre filter">
+          <span class="filter-row-label">Genre</span>
+          <div id="tv-genre-row" class="genre-filters" role="group" aria-label="Filter by genre"></div>
         </div>
         <div id="tv-grid" class="cards-grid"></div>
         <div id="tv-loading" class="loading-state">
