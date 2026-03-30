@@ -423,6 +423,7 @@ async function loadTrending(force = false) {
               sort_by: 'popularity.desc',
               'primary_release_date.gte': fmt(new Date(today.getTime() - 30 * MS_PER_DAY)),
               'primary_release_date.lte': fmt(today),
+              'vote_count.gte': MIN_RATING_VOTES,
               with_genres: movieGenre,
             })
           : await API.movies('now_playing');
@@ -430,7 +431,7 @@ async function loadTrending(force = false) {
       }
       if (type === 'tv' || type === 'all') {
         const data = tvGenre
-          ? await API.discoverTV({ sort_by: 'popularity.desc', with_genres: tvGenre })
+          ? await API.discoverTV({ sort_by: 'popularity.desc', 'vote_count.gte': MIN_RATING_VOTES, with_genres: tvGenre })
           : await API.tvShows('on_the_air');
         tvItems = (data.results || []).map(s => ({ ...s, media_type: 'tv', release_label: '📺 On The Air' }));
       }
@@ -468,9 +469,8 @@ async function loadTrending(force = false) {
 
       if (useNative) {
         const data = await API.trending(type, timeWindow);
-        items = (data.results || []).filter(
-          i => i.media_type === 'movie' || i.media_type === 'tv'
-        );
+        const isMedia = i => i.media_type === 'movie' || i.media_type === 'tv';
+        items = (data.results || []).filter(i => isMedia(i) && (i.vote_count || 0) >= MIN_RATING_VOTES);
       } else {
         const periodConf    = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
         const since         = new Date(today.getTime() - periodConf.days * MS_PER_DAY);
@@ -483,6 +483,7 @@ async function loadTrending(force = false) {
             const data = await API.discoverMovies({
               'primary_release_date.gte': fmt(new Date(today.getTime() - 180 * MS_PER_DAY)),
               'primary_release_date.lte': fmt(new Date(today.getTime() - 42  * MS_PER_DAY)),
+              'vote_count.gte': MIN_RATING_VOTES,
               sort_by: 'popularity.desc',
               ...(movieGenre ? { with_genres: movieGenre } : {}),
             });
@@ -491,6 +492,7 @@ async function loadTrending(force = false) {
             const data = await API.discoverMovies({
               'primary_release_date.gte': fmt(since),
               'primary_release_date.lte': fmt(today),
+              'vote_count.gte': MIN_RATING_VOTES,
               sort_by: 'popularity.desc',
               ...(movieGenre ? { with_genres: movieGenre } : {}),
               ...providerExtra,
@@ -502,6 +504,7 @@ async function loadTrending(force = false) {
           const data = await API.discoverTV({
             'first_air_date.gte': fmt(since),
             'first_air_date.lte': fmt(today),
+            'vote_count.gte': MIN_RATING_VOTES,
             sort_by: 'popularity.desc',
             ...(tvGenre ? { with_genres: tvGenre } : {}),
             ...providerExtra,
@@ -548,6 +551,7 @@ async function loadMovies(force = false) {
           sort_by: 'popularity.desc',
           'primary_release_date.gte': fmt(new Date(today.getTime() - 30 * MS_PER_DAY)),
           'primary_release_date.lte': fmt(today),
+          'vote_count.gte': MIN_RATING_VOTES,
           with_genres: movieGenre,
         });
       } else {
@@ -555,7 +559,7 @@ async function loadMovies(force = false) {
       }
 
     } else if (releaseType === 'upcoming') {
-      // Coming soon
+      // Coming soon — no vote threshold: these haven't been released yet
       const tomorrow  = new Date(today.getTime() + MS_PER_DAY);
       const ninetyOut = new Date(today.getTime() + 90 * MS_PER_DAY);
       data = await API.discoverMovies({
@@ -568,22 +572,21 @@ async function loadMovies(force = false) {
     } else {
       // Available Now
       if (platform === 'bluray') {
-        // Blu-Ray/DVD window (6 weeks – 6 months ago); skip vote threshold — disc releases
-        // are recent enough that many haven't accumulated 200 votes yet.
         data = await API.discoverMovies({
           'primary_release_date.gte': fmt(new Date(today.getTime() - 180 * MS_PER_DAY)),
           'primary_release_date.lte': fmt(new Date(today.getTime() - 42  * MS_PER_DAY)),
+          'vote_count.gte': MIN_RATING_VOTES,
           sort_by: sortBy,
           ...(movieGenre ? { with_genres: movieGenre } : {}),
         });
       } else if (movieGenre || platform !== 'all') {
-        // Period + genre/platform filter; skip vote threshold for same reason
         const periodConf    = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
         const since         = new Date(today.getTime() - periodConf.days * MS_PER_DAY);
         const providerExtra = platform === 'all' ? {} : { with_watch_providers: platform, watch_region: CONFIG.REGION };
         data = await API.discoverMovies({
           'primary_release_date.gte': fmt(since),
           'primary_release_date.lte': fmt(today),
+          'vote_count.gte': MIN_RATING_VOTES,
           sort_by: sortBy,
           ...(movieGenre ? { with_genres: movieGenre } : {}),
           ...providerExtra,
@@ -626,6 +629,7 @@ async function loadTV(force = false) {
       if (tvGenre) {
         data = await API.discoverTV({
           sort_by: 'popularity.desc',
+          'vote_count.gte': MIN_RATING_VOTES,
           ...(tvGenre ? { with_genres: tvGenre } : {}),
         });
       } else {
@@ -633,7 +637,7 @@ async function loadTV(force = false) {
       }
 
     } else if (releaseType === 'upcoming') {
-      // Coming soon TV
+      // Coming soon TV — no vote threshold: not yet released
       const tomorrow  = new Date(today.getTime() + MS_PER_DAY);
       const ninetyOut = new Date(today.getTime() + 90 * MS_PER_DAY);
       data = await API.discoverTV({
@@ -649,13 +653,13 @@ async function loadTV(force = false) {
         // Blu-ray is movies-only; fall back to standard TV endpoint
         data = await API.tvShows(sort === 'rating' ? 'top_rated' : 'popular');
       } else if (tvGenre || platform !== 'all') {
-        // Period + genre/platform; skip vote threshold — recent shows won't have 200 votes
         const periodConf    = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
         const since         = new Date(today.getTime() - periodConf.days * MS_PER_DAY);
         const providerExtra = platform === 'all' ? {} : { with_watch_providers: platform, watch_region: CONFIG.REGION };
         data = await API.discoverTV({
           'first_air_date.gte': fmt(since),
           'first_air_date.lte': fmt(today),
+          'vote_count.gte': MIN_RATING_VOTES,
           sort_by: sortBy,
           ...(tvGenre ? { with_genres: tvGenre } : {}),
           ...providerExtra,
