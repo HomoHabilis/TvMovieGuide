@@ -12,7 +12,8 @@ const API = {
    * @param {Object} params    - Extra query params
    */
   async request(endpoint, params = {}) {
-    const apiKey = ApiKeyManager.get();
+    const apiKey = CONFIG.API_KEY;
+    if (apiKey === '__TMDB_API_KEY__') throw new Error('TMDB_API_KEY_NOT_CONFIGURED');
     if (!apiKey) throw new Error('NO_KEY');
 
     const url = new URL(`${CONFIG.TMDB_BASE_URL}${endpoint}`);
@@ -110,17 +111,6 @@ const API = {
       include_adult: false,
       ...filters,
     });
-  },
-
-  /* ---------- Validation ---------- */
-
-  async validateKey(key) {
-    const url = new URL(`${CONFIG.TMDB_BASE_URL}/configuration`);
-    url.searchParams.set('api_key', key);
-    const res = await fetch(url.toString());
-    if (res.status === 401) throw new Error('INVALID_KEY');
-    if (!res.ok) throw new Error(`HTTP_${res.status}`);
-    return true;
   },
 
   /* ---------- Image helpers ---------- */

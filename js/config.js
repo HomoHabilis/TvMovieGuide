@@ -10,7 +10,8 @@ const CONFIG = {
   POSTER_SIZE: 'w500',
   BACKDROP_SIZE: 'w1280',
   SMALL_POSTER_SIZE: 'w185',
-  STORAGE_KEY: 'tvmovieguide_api_key',
+  /** Replaced by the GitHub Actions deployment workflow via the TMDB_API_KEY secret. */
+  API_KEY: '__TMDB_API_KEY__',
   REGION: 'US',
   LANGUAGE: 'en-US',
   CACHE_DURATION_MINUTES: 5,
@@ -56,16 +57,6 @@ const CONFIG = {
     { id: '3months', label: 'Last 3 Months',  days: 90  },
     { id: 'year',    label: 'Last Year',      days: 365 },
   ],
-};
-
-/* ---------------------------------------------------------------
-   API Key Manager — persists key in localStorage
-   --------------------------------------------------------------- */
-const ApiKeyManager = {
-  get()    { return localStorage.getItem(CONFIG.STORAGE_KEY); },
-  set(key) { localStorage.setItem(CONFIG.STORAGE_KEY, key.trim()); },
-  clear()  { localStorage.removeItem(CONFIG.STORAGE_KEY); },
-  exists() { return !!localStorage.getItem(CONFIG.STORAGE_KEY); },
 };
 
 /* ---------------------------------------------------------------

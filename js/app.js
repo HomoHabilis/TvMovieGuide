@@ -45,77 +45,13 @@ const el = id => document.getElementById(id);
    Boot
    --------------------------------------------------------------- */
 document.addEventListener('DOMContentLoaded', () => {
-  if (ApiKeyManager.exists()) {
-    launchApp();
-  } else {
-    showSetupModal();
-  }
-  bindSetupEvents();
+  launchApp();
 });
-
-/* ---------------------------------------------------------------
-   Setup modal
-   --------------------------------------------------------------- */
-function showSetupModal() {
-  el('setup-modal').classList.remove('hidden');
-  el('app').classList.add('hidden');
-}
-
-function hideSetupModal() {
-  el('setup-modal').classList.add('hidden');
-  el('app').classList.remove('hidden');
-}
-
-function bindSetupEvents() {
-  el('save-api-key').addEventListener('click', handleSaveKey);
-  el('api-key-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') handleSaveKey();
-  });
-  el('settings-btn').addEventListener('click', () => {
-    el('api-key-input').value = ApiKeyManager.get() || '';
-    el('api-key-error').textContent = '';
-    el('setup-modal').classList.remove('hidden');
-  });
-}
-
-async function handleSaveKey() {
-  const keyInput = el('api-key-input');
-  const errSpan  = el('api-key-error');
-  const key = keyInput.value.trim();
-
-  if (!key) {
-    errSpan.textContent = 'Please enter your API key.';
-    keyInput.focus();
-    return;
-  }
-
-  const btn = el('save-api-key');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating…';
-  errSpan.textContent = '';
-
-  try {
-    await API.validateKey(key);
-    ApiKeyManager.set(key);
-    hideSetupModal();
-    launchApp();
-  } catch (err) {
-    errSpan.textContent =
-      err.message === 'INVALID_KEY'
-        ? 'Invalid API key — please check and try again.'
-        : 'Could not connect to TMDB. Check your internet connection.';
-    keyInput.focus();
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-play"></i> Launch TvMovieGuide';
-  }
-}
 
 /* ---------------------------------------------------------------
    App launch
    --------------------------------------------------------------- */
 function launchApp() {
-  hideSetupModal();
   initFilters();
   bindAppEvents();
   navigateTo('trending');
@@ -1243,22 +1179,16 @@ function setLoading(spinnerEl, visible) {
 }
 
 function handleError(err, container) {
-  const isKey = err.message === 'INVALID_KEY' || err.message === 'NO_KEY';
+  const isKey = err.message === 'INVALID_KEY' || err.message === 'NO_KEY' ||
+                err.message === 'TMDB_API_KEY_NOT_CONFIGURED';
   container.innerHTML = `
     <div class="error-state">
       <i class="fas fa-exclamation-triangle fa-2x"></i>
       <p>${isKey
-        ? 'Invalid or missing API key. <a href="#" id="err-rekey">Update key</a>'
+        ? 'TMDB API key is missing or invalid. Please check the deployment configuration.'
         : 'Failed to load content. Please try again later.'
       }</p>
     </div>`;
-  if (isKey) {
-    const link = container.querySelector('#err-rekey');
-    if (link) link.addEventListener('click', e => {
-      e.preventDefault();
-      showSetupModal();
-    });
-  }
 }
 
 /** Escape HTML special chars */
