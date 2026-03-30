@@ -536,20 +536,19 @@ async function loadMovies(force = false) {
   const today      = new Date();
   const fmt        = d => d.toISOString().split('T')[0];
   const sortBy     = sort === 'rating' ? 'vote_average.desc' : 'popularity.desc';
-  const minVotes   = sort === 'rating' ? 200 : undefined;
 
   try {
     let data;
 
     if (releaseType === 'theaters') {
-      // Now playing movies
-      if (movieGenre || sort === 'rating') {
+      // In Theaters: always sort by popularity — current releases don't have enough votes
+      // for a meaningful rating sort (most in-cinema titles have fewer than 200 votes).
+      if (movieGenre) {
         data = await API.discoverMovies({
-          sort_by: sortBy,
-          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
-          ...(movieGenre ? { with_genres: movieGenre } : {}),
+          sort_by: 'popularity.desc',
           'primary_release_date.gte': fmt(new Date(today.getTime() - 30 * MS_PER_DAY)),
           'primary_release_date.lte': fmt(today),
+          with_genres: movieGenre,
         });
       } else {
         data = await API.movies('now_playing');
@@ -569,14 +568,16 @@ async function loadMovies(force = false) {
     } else {
       // Available Now
       if (platform === 'bluray') {
+        // Blu-Ray/DVD window (6 weeks – 6 months ago); skip vote threshold — disc releases
+        // are recent enough that many haven't accumulated 200 votes yet.
         data = await API.discoverMovies({
           'primary_release_date.gte': fmt(new Date(today.getTime() - 180 * MS_PER_DAY)),
           'primary_release_date.lte': fmt(new Date(today.getTime() - 42  * MS_PER_DAY)),
           sort_by: sortBy,
-          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
           ...(movieGenre ? { with_genres: movieGenre } : {}),
         });
       } else if (movieGenre || platform !== 'all') {
+        // Period + genre/platform filter; skip vote threshold for same reason
         const periodConf    = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
         const since         = new Date(today.getTime() - periodConf.days * MS_PER_DAY);
         const providerExtra = platform === 'all' ? {} : { with_watch_providers: platform, watch_region: CONFIG.REGION };
@@ -584,12 +585,11 @@ async function loadMovies(force = false) {
           'primary_release_date.gte': fmt(since),
           'primary_release_date.lte': fmt(today),
           sort_by: sortBy,
-          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
           ...(movieGenre ? { with_genres: movieGenre } : {}),
           ...providerExtra,
         });
       } else {
-        // No filters — standard endpoint
+        // No filters — standard TMDB top-rated / popular endpoint (full library, all-time)
         data = await API.movies(sort === 'rating' ? 'top_rated' : 'popular');
       }
     }
@@ -617,17 +617,15 @@ async function loadTV(force = false) {
   const today     = new Date();
   const fmt       = d => d.toISOString().split('T')[0];
   const sortBy    = sort === 'rating' ? 'vote_average.desc' : 'popularity.desc';
-  const minVotes  = sort === 'rating' ? 200 : undefined;
 
   try {
     let data;
 
     if (releaseType === 'theaters') {
-      // On the air TV shows
-      if (tvGenre || sort === 'rating') {
+      // On the air: always sort by popularity — current shows lack enough votes for rating sort
+      if (tvGenre) {
         data = await API.discoverTV({
-          sort_by: sortBy,
-          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
+          sort_by: 'popularity.desc',
           ...(tvGenre ? { with_genres: tvGenre } : {}),
         });
       } else {
@@ -651,6 +649,7 @@ async function loadTV(force = false) {
         // Blu-ray is movies-only; fall back to standard TV endpoint
         data = await API.tvShows(sort === 'rating' ? 'top_rated' : 'popular');
       } else if (tvGenre || platform !== 'all') {
+        // Period + genre/platform; skip vote threshold — recent shows won't have 200 votes
         const periodConf    = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
         const since         = new Date(today.getTime() - periodConf.days * MS_PER_DAY);
         const providerExtra = platform === 'all' ? {} : { with_watch_providers: platform, watch_region: CONFIG.REGION };
@@ -658,12 +657,11 @@ async function loadTV(force = false) {
           'first_air_date.gte': fmt(since),
           'first_air_date.lte': fmt(today),
           sort_by: sortBy,
-          ...(minVotes ? { 'vote_count.gte': minVotes } : {}),
           ...(tvGenre ? { with_genres: tvGenre } : {}),
           ...providerExtra,
         });
       } else {
-        // No filters — standard endpoint
+        // No filters — standard TMDB top-rated / popular endpoint (full library, all-time)
         data = await API.tvShows(sort === 'rating' ? 'top_rated' : 'popular');
       }
     }
@@ -1089,6 +1087,9 @@ function renderDetailModal(d, mediaType) {
     ? `https://www.imdb.com/title/${imdbId}`
     : `https://www.imdb.com/find?q=${encodeURIComponent(title)}&s=tt`;
   const rtUrl   = `https://www.rottentomatoes.com/search?search=${encodeURIComponent(title)}`;
+
+  // Overview
+  const overview = d.overview || 'No overview available.';
 
   // Trailer (YouTube — first official trailer, fallback to any YouTube video)
   // Single-pass: priority order official Trailer > Trailer > any YouTube
