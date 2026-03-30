@@ -622,7 +622,6 @@ input, textarea { font: inherit; }
   display: flex;
   flex-wrap: wrap;
   gap: .5rem;
-  margin-bottom: 1.5rem;
 }
 .platform-btn {
   display: inline-flex;
@@ -668,6 +667,101 @@ input, textarea { font: inherit; }
 .pf-icon.apple     { background: var(--apple);     }
 .pf-icon.peacock   { background: #0a2a5a;          }
 .pf-icon.paramount { background: var(--paramount); }
+
+/* ── 13b. Release type tabs ───────────────────────────────── */
+.release-type-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+}
+.release-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .3rem;
+  padding: .9rem .5rem;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  color: var(--txt-mid);
+  transition: background var(--trans), border-color var(--trans);
+  text-align: center;
+}
+.release-type-btn i { font-size: 1.4rem; margin-bottom: .1rem; }
+.rtype-label { font-size: .88rem; font-weight: 700; color: var(--txt-hi); display: block; }
+.rtype-sub   { font-size: .72rem; color: var(--txt-lo); display: block; }
+.release-type-btn:hover {
+  background: var(--bg-card-h);
+  border-color: var(--border-h);
+}
+.release-type-btn.active {
+  border-color: var(--accent);
+  background: rgba(229,9,20,.08);
+}
+.release-type-btn.active i,
+.release-type-btn.active .rtype-label { color: var(--accent); }
+
+/* ── 13c. Filter label rows ───────────────────────────────── */
+.filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .6rem;
+  margin-bottom: .85rem;
+}
+.filter-row-label {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--txt-lo);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  white-space: nowrap;
+  min-width: 52px;
+  flex-shrink: 0;
+}
+
+/* ── 13d. Period buttons (share btn-group style) ──────────── */
+.period-btn {
+  padding: .38rem .85rem;
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--txt-mid);
+  background: transparent;
+  border: none;
+  transition: background var(--trans), color var(--trans);
+}
+.period-btn:hover  { background: rgba(255,255,255,.08); color: var(--txt-hi); }
+.period-btn.active { background: var(--accent); color: #fff; }
+
+/* ── 13e. Genre filter buttons ────────────────────────────── */
+.genre-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+.genre-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: .33rem .75rem;
+  border-radius: 20px;
+  font-size: .8rem;
+  font-weight: 500;
+  color: var(--txt-mid);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: background var(--trans), color var(--trans), border-color var(--trans);
+}
+.genre-btn:hover {
+  background: var(--bg-card-h);
+  color: var(--txt-hi);
+  border-color: var(--border-h);
+}
+.genre-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
 
 /* ── 14. Loading & empty states ───────────────────────────── */
 .loading-state {
@@ -1051,6 +1145,9 @@ input, textarea { font: inherit; }
   .cards-grid { grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); gap: .65rem; }
   .platform-filters { gap: .35rem; }
   .platform-btn { font-size: .75rem; padding: .35rem .7rem; }
+  .release-type-row { grid-template-columns: 1fr; }
+  .release-type-btn { flex-direction: row; gap: .65rem; padding: .65rem .85rem; text-align: left; }
+  .release-type-btn i { font-size: 1.15rem; }
 }
 
 @media (min-width: 1024px) {

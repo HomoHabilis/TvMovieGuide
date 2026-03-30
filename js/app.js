@@ -15,7 +15,12 @@ const State = {
   trending: { period: 'week', type: 'all' },
   movies:   { category: 'popular' },
   tv:       { category: 'popular' },
-  releases: { platform: 'all' },
+  releases: {
+    releaseType: 'released',  // 'released' | 'theaters' | 'upcoming'
+    period:      'month',     // 'week' | 'month' | '3months' | 'year'
+    platform:    'all',       // 'all' | TMDB provider ID | 'bluray'
+    genre:       'all',       // GENRE_FILTERS[n].id
+  },
   search:   { query: '' },
   heroItem: null,
 };
@@ -102,8 +107,39 @@ async function handleSaveKey() {
    --------------------------------------------------------------- */
 function launchApp() {
   hideSetupModal();
+  initGenreButtons();
   bindAppEvents();
   navigateTo('trending');
+}
+
+/* ---------------------------------------------------------------
+   Genre buttons — generated from CONFIG.GENRE_FILTERS
+   --------------------------------------------------------------- */
+function initGenreButtons() {
+  const container = el('genre-filter-row');
+  if (!container) return;
+  CONFIG.GENRE_FILTERS.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'genre-btn' + (g.id === 'all' ? ' active' : '');
+    btn.dataset.genre = g.id;
+    btn.textContent = g.label;
+    btn.addEventListener('click', () => {
+      $$('.genre-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      State.releases.genre = g.id;
+      loadReleases(true);
+    });
+    container.appendChild(btn);
+  });
+}
+
+/* ---------------------------------------------------------------
+   Show/hide period + platform rows based on release type
+   --------------------------------------------------------------- */
+function updateReleasesFilterVisibility() {
+  const isReleased = State.releases.releaseType === 'released';
+  el('releases-period-row').classList.toggle('hidden', !isReleased);
+  el('releases-platform-row').classList.toggle('hidden', !isReleased);
 }
 
 /* ---------------------------------------------------------------
@@ -196,6 +232,27 @@ function bindAppEvents() {
       $$('.platform-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       State.releases.platform = btn.dataset.platform;
+      loadReleases(true);
+    });
+  });
+
+  // Release type tabs (Available Now / In Theaters / Coming Soon)
+  $$('.release-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('.release-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      State.releases.releaseType = btn.dataset.rtype;
+      updateReleasesFilterVisibility();
+      loadReleases(true);
+    });
+  });
+
+  // Release period buttons (Last Week / Last Month / …)
+  $$('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      State.releases.period = btn.dataset.period;
       loadReleases(true);
     });
   });
@@ -298,60 +355,116 @@ async function loadReleases(force = false) {
   setLoading(spinner, true);
   grid.innerHTML = '';
 
-  const today      = new Date();
-  const fmt = d => d.toISOString().split('T')[0];
+  const today = new Date();
+  const fmt   = d => d.toISOString().split('T')[0];
+  const { releaseType, period, platform, genre } = State.releases;
+
+  // Resolve genre filter params for movies and TV (fall back to 'all' if not found)
+  const genreConf  = CONFIG.GENRE_FILTERS.find(g => g.id === genre) || CONFIG.GENRE_FILTERS[0];
+  const movieGenre = genreConf.movieId ? String(genreConf.movieId) : undefined;
+  const tvGenre    = genreConf.tvId    ? String(genreConf.tvId)    : undefined;
+
+  /** Returns true when an item's genre_ids include genreId (or no filter is set). */
+  const matchesGenre = (item, genreId) =>
+    !genreId || (item.genre_ids || []).includes(genreId);
 
   try {
     let movieItems = [];
     let tvItems    = [];
-    const platform = State.releases.platform;
 
-    if (platform === 'all') {
-      const thirtyDaysAgo  = new Date(today - 30 * MS_PER_DAY);
-      const thirtyDaysLater = new Date(today.getTime() + 30 * MS_PER_DAY);
+    if (releaseType === 'theaters') {
+      /* ---- In Theaters: now playing movies + currently airing TV ---- */
+      const [movies, tv] = await Promise.all([
+        API.movies('now_playing'),
+        API.tvShows('on_the_air'),
+      ]);
+      // Post-filter by genre (genre_ids returned by the endpoint)
+      movieItems = (movies.results || [])
+        .filter(m => matchesGenre(m, genreConf.movieId))
+        .map(m => ({ ...m, media_type: 'movie', release_label: '🎥 In Theaters' }));
+      tvItems = (tv.results || [])
+        .filter(s => matchesGenre(s, genreConf.tvId))
+        .map(s => ({ ...s, media_type: 'tv', release_label: '📺 On The Air' }));
+
+    } else if (releaseType === 'upcoming') {
+      /* ---- Coming Soon: next 90 days ---- */
+      const tomorrow  = new Date(today.getTime() + MS_PER_DAY);
+      const ninetyOut = new Date(today.getTime() + 90 * MS_PER_DAY);
       const [movies, tv] = await Promise.all([
         API.discoverMovies({
-          'primary_release_date.gte': fmt(thirtyDaysAgo),
-          'primary_release_date.lte': fmt(thirtyDaysLater),
+          'primary_release_date.gte': fmt(tomorrow),
+          'primary_release_date.lte': fmt(ninetyOut),
+          sort_by: 'primary_release_date.asc',
+          ...(movieGenre ? { with_genres: movieGenre } : {}),
         }),
         API.discoverTV({
-          'first_air_date.gte': fmt(thirtyDaysAgo),
-          'first_air_date.lte': fmt(thirtyDaysLater),
+          'first_air_date.gte': fmt(tomorrow),
+          'first_air_date.lte': fmt(ninetyOut),
+          sort_by: 'first_air_date.asc',
+          ...(tvGenre ? { with_genres: tvGenre } : {}),
         }),
       ]);
-      movieItems = (movies.results || []).map(m => ({ ...m, media_type: 'movie' }));
-      tvItems    = (tv.results    || []).map(s => ({ ...s, media_type: 'tv' }));
-
-    } else if (platform === 'bluray') {
-      // Blu-Ray: movies released ~6 weeks–6 months ago (typical window)
-      const sixMonthsAgo = new Date(today - 180 * MS_PER_DAY);
-      const sixWeeksAgo  = new Date(today - 42  * MS_PER_DAY);
-      const movies = await API.discoverMovies({
-        sort_by: 'popularity.desc',
-        'primary_release_date.gte': fmt(sixMonthsAgo),
-        'primary_release_date.lte': fmt(sixWeeksAgo),
-        'vote_count.gte': 20,
-      });
       movieItems = (movies.results || []).map(m => ({
-        ...m,
-        media_type: 'movie',
-        release_label: '📀 Blu-Ray / DVD',
+        ...m, media_type: 'movie', release_label: '📅 Coming Soon',
+      }));
+      tvItems = (tv.results || []).map(s => ({
+        ...s, media_type: 'tv', release_label: '📅 Coming Soon',
       }));
 
     } else {
-      // Streaming platform filter
-      const [movies, tv] = await Promise.all([
-        API.discoverMovies({ with_watch_providers: platform, watch_region: CONFIG.REGION }),
-        API.discoverTV({ with_watch_providers: platform, watch_region: CONFIG.REGION }),
-      ]);
-      movieItems = (movies.results || []).map(m => ({ ...m, media_type: 'movie' }));
-      tvItems    = (tv.results    || []).map(s => ({ ...s, media_type: 'tv' }));
+      /* ---- Available Now (released) ---- */
+      const periodConf = CONFIG.RELEASE_PERIODS.find(p => p.id === period) || CONFIG.RELEASE_PERIODS[1];
+      const since = new Date(today - periodConf.days * MS_PER_DAY);
+
+      if (platform === 'bluray') {
+        // Blu-Ray/DVD: typical theatrical-to-disc window (6 weeks – 6 months ago)
+        const sixMonthsAgo = new Date(today - 180 * MS_PER_DAY);
+        const sixWeeksAgo  = new Date(today - 42  * MS_PER_DAY);
+        const movies = await API.discoverMovies({
+          'primary_release_date.gte': fmt(sixMonthsAgo),
+          'primary_release_date.lte': fmt(sixWeeksAgo),
+          'vote_count.gte': 20,
+          ...(movieGenre ? { with_genres: movieGenre } : {}),
+        });
+        movieItems = (movies.results || []).map(m => ({
+          ...m, media_type: 'movie', release_label: '📀 Blu-Ray / DVD',
+        }));
+
+      } else {
+        const baseMovieParams = {
+          'primary_release_date.gte': fmt(since),
+          'primary_release_date.lte': fmt(today),
+          ...(movieGenre ? { with_genres: movieGenre } : {}),
+        };
+        const baseTVParams = {
+          'first_air_date.gte': fmt(since),
+          'first_air_date.lte': fmt(today),
+          ...(tvGenre ? { with_genres: tvGenre } : {}),
+        };
+
+        const providerExtra = platform === 'all'
+          ? {}
+          : { with_watch_providers: platform, watch_region: CONFIG.REGION };
+
+        const [movies, tv] = await Promise.all([
+          API.discoverMovies({ ...baseMovieParams, ...providerExtra }),
+          API.discoverTV({    ...baseTVParams,    ...providerExtra }),
+        ]);
+        movieItems = (movies.results || []).map(m => ({ ...m, media_type: 'movie' }));
+        tvItems    = (tv.results    || []).map(s => ({ ...s, media_type: 'tv' }));
+      }
     }
 
-    // Interleave movies and TV shows, sorted by popularity
-    const combined = [...movieItems, ...tvItems].sort(
-      (a, b) => (b.popularity || 0) - (a.popularity || 0)
-    );
+    // Sort: upcoming by release date asc; everything else by popularity desc
+    const sortFn = releaseType === 'upcoming'
+      ? (a, b) => {
+          const da = a.release_date || a.first_air_date || '';
+          const db = b.release_date || b.first_air_date || '';
+          return da.localeCompare(db);
+        }
+      : (a, b) => (b.popularity || 0) - (a.popularity || 0);
+
+    const combined = [...movieItems, ...tvItems].sort(sortFn);
 
     if (combined.length === 0) {
       grid.innerHTML = `

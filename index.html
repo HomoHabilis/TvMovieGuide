@@ -270,42 +270,83 @@
           <h2 class="section-title">
             <i class="fas fa-compact-disc"></i> New Releases
           </h2>
-          <p class="section-sub">Browse the latest movies &amp; shows across all platforms</p>
         </div>
 
-        <div class="platform-filters" role="group" aria-label="Filter by platform">
-          <button class="platform-btn active" data-platform="all">
-            <i class="fas fa-globe"></i> All Platforms
+        <!-- 1. Release type tabs -->
+        <div class="release-type-row" role="group" aria-label="Select release type">
+          <button class="release-type-btn active" data-rtype="released">
+            <i class="fas fa-play-circle"></i>
+            <span class="rtype-label">Available Now</span>
+            <span class="rtype-sub">Streaming &amp; Disc</span>
           </button>
-          <button class="platform-btn" data-platform="8">
-            <span class="pf-icon netflix">N</span> Netflix
+          <button class="release-type-btn" data-rtype="theaters">
+            <i class="fas fa-film"></i>
+            <span class="rtype-label">In Theaters</span>
+            <span class="rtype-sub">Currently in cinemas</span>
           </button>
-          <button class="platform-btn" data-platform="337">
-            <span class="pf-icon disney">D+</span> Disney+
+          <button class="release-type-btn" data-rtype="upcoming">
+            <i class="fas fa-calendar-alt"></i>
+            <span class="rtype-label">Coming Soon</span>
+            <span class="rtype-sub">Not yet released</span>
           </button>
-          <button class="platform-btn" data-platform="1899">
-            <span class="pf-icon max">M</span> Max
-          </button>
-          <button class="platform-btn" data-platform="15">
-            <span class="pf-icon hulu">H</span> Hulu
-          </button>
-          <button class="platform-btn" data-platform="9">
-            <span class="pf-icon prime">P</span> Prime Video
-          </button>
-          <button class="platform-btn" data-platform="350">
-            <span class="pf-icon apple">A</span> Apple TV+
-          </button>
-          <button class="platform-btn" data-platform="386">
-            <span class="pf-icon peacock">🦚</span> Peacock
-          </button>
-          <button class="platform-btn" data-platform="bluray">
-            <i class="fas fa-compact-disc"></i> Blu-Ray / DVD
-          </button>
+        </div>
+
+        <!-- 2. Time period (Available Now only) -->
+        <div id="releases-period-row" class="filter-row" role="group" aria-label="Release period">
+          <span class="filter-row-label">Period</span>
+          <div class="btn-group">
+            <button class="period-btn active" data-period="month">Last Month</button>
+            <button class="period-btn" data-period="week">Last Week</button>
+            <button class="period-btn" data-period="3months">Last 3 Months</button>
+            <button class="period-btn" data-period="year">Last Year</button>
+          </div>
+        </div>
+
+        <!-- 3. Platform (Available Now only) -->
+        <div id="releases-platform-row" class="filter-row" aria-label="Platform filter">
+          <span class="filter-row-label">Platform</span>
+          <div class="platform-filters" role="group" aria-label="Filter by platform">
+            <button class="platform-btn active" data-platform="all">
+              <i class="fas fa-globe"></i> All
+            </button>
+            <button class="platform-btn" data-platform="8">
+              <span class="pf-icon netflix">N</span> Netflix
+            </button>
+            <button class="platform-btn" data-platform="337">
+              <span class="pf-icon disney">D+</span> Disney+
+            </button>
+            <button class="platform-btn" data-platform="1899">
+              <span class="pf-icon max">M</span> Max
+            </button>
+            <button class="platform-btn" data-platform="15">
+              <span class="pf-icon hulu">H</span> Hulu
+            </button>
+            <button class="platform-btn" data-platform="9">
+              <span class="pf-icon prime">P</span> Prime Video
+            </button>
+            <button class="platform-btn" data-platform="350">
+              <span class="pf-icon apple">A</span> Apple TV+
+            </button>
+            <button class="platform-btn" data-platform="386">
+              <span class="pf-icon peacock">🦚</span> Peacock
+            </button>
+            <button class="platform-btn" data-platform="bluray">
+              <i class="fas fa-compact-disc"></i> Blu-Ray / DVD
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Genre (always visible) -->
+        <div class="filter-row" aria-label="Genre filter">
+          <span class="filter-row-label">Genre</span>
+          <div id="genre-filter-row" class="genre-filters" role="group" aria-label="Filter by genre">
+            <!-- Populated dynamically from CONFIG.GENRE_FILTERS -->
+          </div>
         </div>
 
         <div id="releases-grid" class="cards-grid"></div>
         <div id="releases-loading" class="loading-state">
-          <div class="spinner"></div><p>Loading new releases…</p>
+          <div class="spinner"></div><p>Loading releases…</p>
         </div>
       </section>
 
